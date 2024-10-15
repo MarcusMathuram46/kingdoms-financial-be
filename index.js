@@ -16,7 +16,7 @@ const UserSchema = new mongoose.Schema({
     password: String,
 })
 const User = mongoose.model('User',UserSchema);
-app.post('http://localhost:5173/api/login', async(req, res)=>{
+app.post('api/login', async(req, res)=>{
     const { username, password } = req.body;
     const user = await User.findOne({ username, password });
     if(user){
