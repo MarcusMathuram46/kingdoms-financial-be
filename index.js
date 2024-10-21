@@ -36,35 +36,28 @@ const User = mongoose.model('User', UserSchema);
 
 // Login Route
 // Login Route
+const bcrypt = require('bcrypt');
+
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
-    console.log(`Login attempt: username=${username}, password=${password}`);  // Log the login attempt
-    
     try {
         const user = await User.findOne({ username });
         if (!user) {
-            console.log("Invalid credentials: User not found");
             return res.status(401).json({ message: 'Invalid username or password' });
         }
 
-        // Compare plain password or hashed password
-        if (user.password === password) {  // If using hashing, replace this with a password compare method
-            console.log("User found:", user);
-            if (user.isAdmin) {
-                res.status(200).json({ message: 'Login successful', isAdmin: true });
-            } else {
-                console.log("Unauthorized: User is not an admin");
-                res.status(403).json({ message: 'Unauthorized: Only admins can login' });
-            }
+        const passwordMatch = await bcrypt.compare(password, user.password);  // Compare hashed password
+        if (passwordMatch && user.isAdmin) {
+            res.status(200).json({ message: 'Login successful', isAdmin: true });
         } else {
-            console.log("Invalid credentials: Incorrect password");
-            return res.status(401).json({ message: 'Invalid username or password' });
+            res.status(403).json({ message: 'Unauthorized: Only admins can login' });
         }
     } catch (error) {
         console.error("Server error:", error);
         res.status(500).json({ message: 'Server error', error });
     }
 });
+
 
 
 // Start the server
