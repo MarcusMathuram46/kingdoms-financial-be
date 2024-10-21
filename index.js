@@ -36,7 +36,6 @@ const User = mongoose.model('User', UserSchema);
 
 // Login Route
 // Login Route
-const bcrypt = require('bcrypt');
 
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
