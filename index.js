@@ -35,36 +35,37 @@ UserSchema.pre('save', async function (next) {
 const User = mongoose.model('User', UserSchema);
 
 // Login Route
+// Login Route
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
-    console.log(`Login attempt: username=${username}`);
-
+    console.log(`Login attempt: username=${username}, password=${password}`);  // Log the login attempt
+    
     try {
         const user = await User.findOne({ username });
-        if (user) {
-            // Compare the hashed password with the provided password
-            const isMatch = await bcrypt.compare(password, user.password);
-            if (isMatch) {
-                if (user.isAdmin) {
-                    console.log("Admin login successful:", username);
-                    return res.status(200).json({ message: 'Login successful', isAdmin: true });
-                } else {
-                    console.log("Unauthorized: User is not an admin");
-                    return res.status(403).json({ message: 'Unauthorized: Only admins can login' });
-                }
+        if (!user) {
+            console.log("Invalid credentials: User not found");
+            return res.status(401).json({ message: 'Invalid username or password' });
+        }
+
+        // Compare plain password or hashed password
+        if (user.password === password) {  // If using hashing, replace this with a password compare method
+            console.log("User found:", user);
+            if (user.isAdmin) {
+                res.status(200).json({ message: 'Login successful', isAdmin: true });
             } else {
-                console.log("Invalid credentials: Incorrect password");
-                return res.status(401).json({ message: 'Invalid credentials' });
+                console.log("Unauthorized: User is not an admin");
+                res.status(403).json({ message: 'Unauthorized: Only admins can login' });
             }
         } else {
-            console.log("Invalid credentials: User not found");
-            return res.status(401).json({ message: 'Invalid credentials' });
+            console.log("Invalid credentials: Incorrect password");
+            return res.status(401).json({ message: 'Invalid username or password' });
         }
     } catch (error) {
         console.error("Server error:", error);
-        return res.status(500).json({ message: 'Server error', error });
+        res.status(500).json({ message: 'Server error', error });
     }
 });
+
 
 // Start the server
 app.listen(PORT, () => {
