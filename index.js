@@ -14,7 +14,7 @@ app.use(express.json());
 mongoose.connect(MONGODB_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-}).then(() => console.log('Mongodb Connected Successfully'))
+}).then(() => console.log('MongoDB Connected Successfully'))
   .catch(err => console.log(err));
 
 // User Schema
@@ -35,12 +35,12 @@ UserSchema.pre('save', async function (next) {
 const User = mongoose.model('User', UserSchema);
 
 // Login Route
-// Login Route
-
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
         const user = await User.findOne({ username });
+        console.log("User found:", user); // Log the user object
+
         if (!user) {
             return res.status(401).json({ message: 'Invalid username or password' });
         }
@@ -57,9 +57,28 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-
-
 // Start the server
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+// Admin User Creation Script (run once to create an admin user)
+const createAdminUser = async () => {
+    const adminUser = new User({
+        username: 'admin',  // Change this as needed
+        password: await bcrypt.hash('admin123', 10),  // Change as needed
+        isAdmin: true,
+    });
+
+    try {
+        await adminUser.save();
+        console.log('Admin user created successfully!');
+    } catch (error) {
+        console.error('Error creating admin user:', error.message);
+    } finally {
+        mongoose.disconnect();
+    }
+};
+
+// Uncomment the line below to create an admin user
+createAdminUser();
