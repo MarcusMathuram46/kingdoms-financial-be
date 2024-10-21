@@ -41,11 +41,16 @@ app.post('/api/login', async (req, res) => {
 
     try {
         const user = await User.findOne({ username });
+        console.log("User found:", user);
+
         if (!user) {
             return res.status(401).json({ message: 'Invalid username or password' });
         }
 
         const passwordMatch = await bcrypt.compare(password, user.password);
+        console.log("Password match:", passwordMatch);
+        console.log("Is Admin:", user.isAdmin);
+
         if (passwordMatch && user.isAdmin) {
             return res.status(200).json({ message: 'Login successful', isAdmin: true });
         } else {
