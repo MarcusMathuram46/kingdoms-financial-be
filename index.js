@@ -4,11 +4,14 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const { MONGODB_URL, PORT } = require('./config');
 
+// Import the Advertisement model
+const Advertisement = require('./models/Advertisement'); // Ensure this path is correct
+
 const app = express();
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Use an environment variable for flexibility
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true
 }));
 app.use(express.json());
@@ -34,7 +37,6 @@ const User = mongoose.model('User', UserSchema);
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
 
-
     try {
         const user = await User.findOne({ username });
         if (!user) {
@@ -50,6 +52,34 @@ app.post('/api/login', async (req, res) => {
     } catch (error) {
         console.error("Server error:", error);
         return res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// Route to get all advertisements
+app.get('/api/advertisements', async (req, res) => {
+    try {
+        const advertisements = await Advertisement.find();
+        res.json(advertisements);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Route to create a new advertisement
+app.post('/api/advertisements', async (req, res) => {
+    const { title, image, description } = req.body;
+
+    const newAdvertisement = new Advertisement({
+        title,
+        image,
+        description,
+    });
+
+    try {
+        const savedAdvertisement = await newAdvertisement.save();
+        res.status(201).json(savedAdvertisement);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
     }
 });
 
