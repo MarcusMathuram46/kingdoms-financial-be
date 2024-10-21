@@ -26,25 +26,28 @@ const User = mongoose.model('User', UserSchema);
 // Login Route
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
+    console.log(`Login attempt: username=${username}, password=${password}`);
     
     try {
-        // Find the user with matching username and password
         const user = await User.findOne({ username, password });
-        
         if (user) {
-            // Check if the user is an admin
+            console.log("User found:", user);  // Log the user object
             if (user.isAdmin) {
                 res.status(200).json({ message: 'Login successful', isAdmin: true });
             } else {
+                console.log("Unauthorized: User is not an admin");
                 res.status(403).json({ message: 'Unauthorized: Only admins can login' });
             }
         } else {
+            console.log("Invalid credentials: User not found");
             res.status(401).json({ message: 'Invalid credentials' });
         }
     } catch (error) {
+        console.error("Server error:", error);
         res.status(500).json({ message: 'Server error', error });
     }
 });
+
 
 // Start server
 app.listen(PORT, () => {
