@@ -33,7 +33,7 @@ const User = mongoose.model('User', UserSchema);
 // Login Route
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
-    console.log("Login attempt for user:", username);
+
 
     try {
         const user = await User.findOne({ username });
@@ -73,7 +73,6 @@ const createAdminUser = async () => {
 
     try {
         await adminUser.save();
-        console.log('Admin user created successfully!');
     } catch (error) {
         if (error.code === 11000) {
             console.error('Admin user already exists:', error.message);
