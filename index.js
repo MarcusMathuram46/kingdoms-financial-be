@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
@@ -15,7 +14,7 @@ mongoose.connect(MONGODB_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 }).then(() => console.log('MongoDB Connected Successfully'))
-  .catch(err => console.log(err));
+  .catch(err => console.log('MongoDB connection error:', err));
 
 // User Schema
 const UserSchema = new mongoose.Schema({
@@ -37,6 +36,8 @@ const User = mongoose.model('User', UserSchema);
 // Login Route
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
+    console.log("Login attempt for user:", username);
+
     try {
         const user = await User.findOne({ username });
         console.log("User found:", user); // Log the user object
@@ -45,15 +46,17 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid username or password' });
         }
 
-        const passwordMatch = await bcrypt.compare(password, user.password);  // Compare hashed password
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        console.log("Password match result:", passwordMatch);
+
         if (passwordMatch && user.isAdmin) {
-            res.status(200).json({ message: 'Login successful', isAdmin: true });
+            return res.status(200).json({ message: 'Login successful', isAdmin: true });
         } else {
-            res.status(403).json({ message: 'Unauthorized: Only admins can login' });
+            return res.status(403).json({ message: 'Unauthorized: Only admins can login' });
         }
     } catch (error) {
         console.error("Server error:", error);
-        res.status(500).json({ message: 'Server error', error });
+        return res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -81,4 +84,4 @@ const createAdminUser = async () => {
 };
 
 // Uncomment the line below to create an admin user
-createAdminUser();
+// createAdminUser();
