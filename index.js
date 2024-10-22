@@ -29,7 +29,10 @@ const storage = multer.diskStorage({
 });
 
 // Initialize upload
-const upload = multer({ storage });
+const upload = multer({ 
+    storage, 
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB limit
+});
 
 // Serve static files from the 'uploads' directory
 app.use('/uploads', express.static('uploads'));
@@ -86,9 +89,13 @@ app.post('/api/advertisements', async (req, res) => {
 
 // Route to upload an image
 app.post('/api/upload', upload.single('image'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+    }
     const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
     res.json({ imageUrl });
 });
+
 
 // Connect to MongoDB and Start the Server
 mongoose.connect(MONGODB_URL)
