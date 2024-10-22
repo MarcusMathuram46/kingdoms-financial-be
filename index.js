@@ -33,7 +33,7 @@ app.use('/uploads', express.static(uploadsDir));
 // Set up Multer storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadsDir); // Use uploadsDir to ensure correct path
+        cb(null, uploadsDir); // Save files to the 'uploads' directory
     },
     filename: (req, file, cb) => {
         // Use a timestamp to create unique filenames
@@ -41,8 +41,8 @@ const storage = multer.diskStorage({
     },
 });
 
-// Initialize upload
-const upload = multer({ 
+// Initialize Multer for image upload
+const upload = multer({
     storage,
     limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB limit
     fileFilter: (req, file, cb) => {
@@ -120,7 +120,7 @@ app.post('/api/advertisements', async (req, res) => {
 
     const newAdvertisement = new Advertisement({
         title,
-        image,
+        image,  // Ensure image URL is passed here after upload
         description,
     });
 
