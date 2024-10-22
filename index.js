@@ -2,11 +2,10 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
-const multer = require('multer'); // Import Multer for file uploads
-const path = require('path');
 const { MONGODB_URL, PORT } = require('./config');
 
 const User = require('./models/User');
+// Import the Advertisement model
 const Advertisement = require('./models/Advertisement'); // Ensure this path is correct
 
 const app = express();
@@ -17,20 +16,9 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+app.use('/images', express.static('path/to/your/images'));
 
-// Set up Multer for file storage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Save file with a unique name
-    }
-});
-const upload = multer({ storage: storage });
 
-// Serve static files in the 'uploads' directory
-app.use('/uploads', express.static('uploads'));
 
 // Login Route
 app.post('/api/login', async (req, res) => {
@@ -64,20 +52,19 @@ app.get('/api/advertisements', async (req, res) => {
     }
 });
 
-// Route to create a new advertisement with image upload
-app.post('/api/advertisements', upload.single('image'), async (req, res) => {
-    const { title, description } = req.body;
-    const imageUrl = `/uploads/${req.file.filename}`;  // Get the relative URL to the image
+// Route to create a new advertisement
+app.post('/api/advertisements', async (req, res) => {
+    const { title, image, description } = req.body;
 
     const newAdvertisement = new Advertisement({
         title,
-        image: imageUrl,  // Save the image URL in MongoDB
+        image,
         description,
     });
 
     try {
         const savedAdvertisement = await newAdvertisement.save();
-        res.status(201).json(savedAdvertisement);  // Send the created advertisement in response
+        res.status(201).json(savedAdvertisement);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }

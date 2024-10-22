@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt'); // Import bcrypt
 
 // User Schema
 const UserSchema = new mongoose.Schema({
@@ -16,3 +17,5 @@ UserSchema.pre('save', async function (next) {
 });
 
 const User = mongoose.model('User', UserSchema);
+
+module.exports = User; // Ensure the User model is exported
