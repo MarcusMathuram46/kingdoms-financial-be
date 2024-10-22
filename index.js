@@ -36,8 +36,8 @@ const storage = multer.diskStorage({
         cb(null, uploadsDir); // Use uploadsDir to ensure correct path
     },
     filename: (req, file, cb) => {
-        // Using the original name to maintain clarity, while ensuring unique filenames
-        cb(null, Date.now() + path.extname(file.originalname)); 
+        // Use a timestamp to create unique filenames
+        cb(null, Date.now() + path.extname(file.originalname));
     },
 });
 
@@ -49,6 +49,8 @@ const upload = multer({
         const filetypes = /jpeg|jpg|png|gif/; // Allowed file types
         const mimetype = filetypes.test(file.mimetype);
         const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+
+        console.log(`File type: ${file.mimetype}, Extname: ${path.extname(file.originalname)}`); // Log file type info
 
         if (mimetype && extname) {
             return cb(null, true);
