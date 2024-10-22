@@ -21,7 +21,7 @@ app.use(cors({
 app.use(express.json());
 
 // Create 'uploads' directory if it doesn't exist
-const uploadsDir = 'uploads';
+const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)){
     fs.mkdirSync(uploadsDir);
     console.log('Uploads directory created');
@@ -32,13 +32,12 @@ app.use(express.static('uploads')); // Serve static files from the 'uploads' dir
 // Set up Multer storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/'); // Specify the folder to save uploaded images
+        cb(null, 'uploads/'); // Ensure this path is correct
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Append timestamp to avoid naming conflicts
+        cb(null, Date.now() + path.extname(file.originalname)); // Naming convention
     },
 });
-
 // Initialize upload
 const upload = multer({ 
     storage,
@@ -57,9 +56,6 @@ const upload = multer({
 
 // Handle image upload
 app.post('/api/upload', (req, res) => {
-    console.log("Request body:", req.body); // Log the request body
-    console.log("Request files:", req.files); // Log any files if multipart/form-data is being used
-    
     upload.single('image')(req, res, (err) => {
         if (err) {
             console.error("Multer error:", err);
@@ -67,13 +63,23 @@ app.post('/api/upload', (req, res) => {
         }
 
         if (!req.file) {
+            console.log('No file uploaded:', req.file);
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
         const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        console.log('File uploaded successfully:', imageUrl);
         res.json({ imageUrl });
     });
 });
+
+app.post('/test-upload', upload.single('image'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).send('No file uploaded.');
+    }
+    res.send(`File uploaded: ${req.file.filename}`);
+});
+
 
 
 
