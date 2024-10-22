@@ -49,7 +49,9 @@ const upload = multer({
 app.post('/api/upload', (req, res) => {
     upload.single('image')(req, res, (err) => {
         if (err) {
-            return res.status(500).json({ message: err.message });
+            // Handle Multer error
+            console.error("Multer error:", err); // Log the error for debugging
+            return res.status(500).json({ message: 'File upload failed', error: err.message });
         }
 
         if (!req.file) {
@@ -60,6 +62,7 @@ app.post('/api/upload', (req, res) => {
         res.json({ imageUrl });
     });
 });
+
 
 // Login Route
 app.post('/api/login', async (req, res) => {
