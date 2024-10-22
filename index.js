@@ -17,6 +17,7 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+app.use(express.static('uploads')); // Serve static files from the 'uploads' directory
 
 // Set up Multer storage
 const storage = multer.diskStorage({
@@ -44,12 +45,20 @@ const upload = multer({
     },
 });
 
+// Handle image upload
+app.post('/api/upload', (req, res) => {
+    upload.single('image')(req, res, (err) => {
+        if (err) {
+            return res.status(500).json({ message: err.message });
+        }
 
-// Serve static files from the 'uploads' directory
-app.use('/uploads', express.static('uploads'));
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send('Something broke!');
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        res.json({ imageUrl });
+    });
 });
 
 // Login Route
@@ -102,28 +111,14 @@ app.post('/api/advertisements', async (req, res) => {
     }
 });
 
-// Route to upload an image
-// Route to upload an image
-app.post('/api/upload', (req, res) => {
-    upload.single('image')(req, res, (err) => {
-        if (err) {
-            // Handle Multer error
-            return res.status(500).json({ message: err.message });
-        }
-
-        if (!req.file) {
-            return res.status(400).json({ message: 'No file uploaded' });
-        }
-
-        const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-        res.json({ imageUrl });
-    });
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: 'Something broke!' });
 });
 
-
-
 // Connect to MongoDB and Start the Server
-mongoose.connect(MONGODB_URL)
+mongoose.connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => {
         console.log('MongoDB Connected Successfully');
         app.listen(PORT, () => {
@@ -136,12 +131,13 @@ mongoose.connect(MONGODB_URL)
 const createAdminUser = async () => {
     const adminUser = new User({
         username: 'admin',
-        password: 'admin123', // Plain password; will be hashed
+        password: await bcrypt.hash('admin123', 10), // Hash the password before saving
         isAdmin: true,
     });
 
     try {
         await adminUser.save();
+        console.log('Admin user created successfully');
     } catch (error) {
         if (error.code === 11000) {
             console.error('Admin user already exists:', error.message);
