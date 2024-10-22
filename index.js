@@ -2,11 +2,12 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
+const multer = require('multer'); // Import multer
+const path = require('path'); // For handling file paths
 const { MONGODB_URL, PORT } = require('./config');
 
 const User = require('./models/User');
-// Import the Advertisement model
-const Advertisement = require('./models/Advertisement'); // Ensure this path is correct
+const Advertisement = require('./models/Advertisement');
 
 const app = express();
 
@@ -16,9 +17,22 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
-app.use('/images', express.static('path/to/your/images'));
 
+// Set up Multer storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/'); // Specify the folder to save uploaded images
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname)); // Append timestamp to avoid naming conflicts
+    },
+});
 
+// Initialize upload
+const upload = multer({ storage });
+
+// Serve static files from the 'uploads' directory
+app.use('/uploads', express.static('uploads'));
 
 // Login Route
 app.post('/api/login', async (req, res) => {
@@ -68,6 +82,12 @@ app.post('/api/advertisements', async (req, res) => {
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
+});
+
+// Route to upload an image
+app.post('/api/upload', upload.single('image'), (req, res) => {
+    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    res.json({ imageUrl });
 });
 
 // Connect to MongoDB and Start the Server
