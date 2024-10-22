@@ -2,8 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
-const multer = require('multer'); // Import multer
-const path = require('path'); // For handling file paths
+const multer = require('multer');
+const path = require('path');
 const fs = require('fs');
 
 const { MONGODB_URL, PORT } = require('./config');
@@ -22,22 +22,25 @@ app.use(express.json());
 
 // Create 'uploads' directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)){
+if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir);
     console.log('Uploads directory created');
 }
 
-app.use(express.static('uploads')); // Serve static files from the 'uploads' directory
+// Serve static files from the 'uploads' directory
+app.use('/uploads', express.static(uploadsDir));
 
 // Set up Multer storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/'); // Ensure this path is correct
+        cb(null, uploadsDir); // Use uploadsDir to ensure correct path
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Naming convention
+        // Using the original name to maintain clarity, while ensuring unique filenames
+        cb(null, Date.now() + path.extname(file.originalname)); 
     },
 });
+
 // Initialize upload
 const upload = multer({ 
     storage,
@@ -56,7 +59,11 @@ const upload = multer({
 
 // Handle image upload
 app.post('/api/upload', (req, res) => {
+    console.log('Received upload request');
+
     upload.single('image')(req, res, (err) => {
+        console.log('Inside multer middleware');
+
         if (err) {
             console.error("Multer error:", err);
             return res.status(500).json({ message: 'File upload failed', error: err.message });
@@ -72,16 +79,6 @@ app.post('/api/upload', (req, res) => {
         res.json({ imageUrl });
     });
 });
-
-app.post('/test-upload', upload.single('image'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).send('No file uploaded.');
-    }
-    res.send(`File uploaded: ${req.file.filename}`);
-});
-
-
-
 
 // Login Route
 app.post('/api/login', async (req, res) => {
@@ -149,11 +146,11 @@ mongoose.connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: true 
     })
     .catch(err => console.log('MongoDB connection error:', err));
 
-// Admin User Creation Script (Consider moving this to a separate script for initialization)
+// Admin User Creation Script
 const createAdminUser = async () => {
     const adminUser = new User({
         username: 'admin',
-        password: await bcrypt.hash('admin123', 10), // Hash the password before saving
+        password: await bcrypt.hash('admin123', 10),
         isAdmin: true,
     });
 
