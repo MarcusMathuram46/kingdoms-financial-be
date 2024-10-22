@@ -2,10 +2,11 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
+const multer = require('multer'); // Import Multer for file uploads
+const path = require('path');
 const { MONGODB_URL, PORT } = require('./config');
 
 const User = require('./models/User');
-// Import the Advertisement model
 const Advertisement = require('./models/Advertisement'); // Ensure this path is correct
 
 const app = express();
@@ -17,7 +18,19 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Set up Multer for file storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname)); // Save file with a unique name
+    }
+});
+const upload = multer({ storage: storage });
 
+// Serve static files in the 'uploads' directory
+app.use('/uploads', express.static('uploads'));
 
 // Login Route
 app.post('/api/login', async (req, res) => {
@@ -51,19 +64,20 @@ app.get('/api/advertisements', async (req, res) => {
     }
 });
 
-// Route to create a new advertisement
-app.post('/api/advertisements', async (req, res) => {
-    const { title, image, description } = req.body;
+// Route to create a new advertisement with image upload
+app.post('/api/advertisements', upload.single('image'), async (req, res) => {
+    const { title, description } = req.body;
+    const imageUrl = `/uploads/${req.file.filename}`;  // Get the relative URL to the image
 
     const newAdvertisement = new Advertisement({
         title,
-        image,
+        image: imageUrl,  // Save the image URL in MongoDB
         description,
     });
 
     try {
         const savedAdvertisement = await newAdvertisement.save();
-        res.status(201).json(savedAdvertisement);
+        res.status(201).json(savedAdvertisement);  // Send the created advertisement in response
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
