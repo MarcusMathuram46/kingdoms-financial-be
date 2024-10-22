@@ -47,6 +47,10 @@ const upload = multer({
 
 // Serve static files from the 'uploads' directory
 app.use('/uploads', express.static('uploads'));
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something broke!');
+});
 
 // Login Route
 app.post('/api/login', async (req, res) => {
