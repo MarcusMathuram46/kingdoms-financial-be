@@ -30,9 +30,20 @@ const storage = multer.diskStorage({
 
 // Initialize upload
 const upload = multer({ 
-    storage, 
+    storage,
     limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB limit
+    fileFilter: (req, file, cb) => {
+        const filetypes = /jpeg|jpg|png|gif/; // Allowed file types
+        const mimetype = filetypes.test(file.mimetype);
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+
+        if (mimetype && extname) {
+            return cb(null, true);
+        }
+        cb('Error: File type not supported');
+    },
 });
+
 
 // Serve static files from the 'uploads' directory
 app.use('/uploads', express.static('uploads'));
@@ -88,13 +99,23 @@ app.post('/api/advertisements', async (req, res) => {
 });
 
 // Route to upload an image
-app.post('/api/upload', upload.single('image'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ message: 'No file uploaded' });
-    }
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-    res.json({ imageUrl });
+// Route to upload an image
+app.post('/api/upload', (req, res) => {
+    upload.single('image')(req, res, (err) => {
+        if (err) {
+            // Handle Multer error
+            return res.status(500).json({ message: err.message });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        res.json({ imageUrl });
+    });
 });
+
 
 
 // Connect to MongoDB and Start the Server
