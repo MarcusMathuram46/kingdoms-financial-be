@@ -4,6 +4,8 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const multer = require('multer'); // Import multer
 const path = require('path'); // For handling file paths
+const fs = require('fs');
+
 const { MONGODB_URL, PORT } = require('./config');
 
 const User = require('./models/User');
@@ -17,6 +19,14 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+
+// Create 'uploads' directory if it doesn't exist
+const uploadsDir = 'uploads';
+if (!fs.existsSync(uploadsDir)){
+    fs.mkdirSync(uploadsDir);
+    console.log('Uploads directory created');
+}
+
 app.use(express.static('uploads')); // Serve static files from the 'uploads' directory
 
 // Set up Multer storage
