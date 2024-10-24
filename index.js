@@ -6,8 +6,12 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
+const dotenv = require('dotenv');
 
-const { MONGODB_URL, PORT } = require('./config');
+// Load environment variables from .env file
+dotenv.config();
+
+const { MONGODB_URL, PORT } = process.env;
 
 const User = require('./models/User');
 const Advertisement = require('./models/Advertisement');
@@ -31,6 +35,15 @@ cloudinary.config({
 // Set up Multer for handling file uploads (but won't save locally)
 const storage = multer.memoryStorage(); // Store in memory since we'll upload directly to Cloudinary
 const upload = multer({ storage });
+
+// Middleware to validate advertisement data
+const validateAdvertisement = (req, res, next) => {
+    const { title, description } = req.body;
+    if (!title || !description) {
+        return res.status(400).json({ message: 'Title and description are required' });
+    }
+    next();
+};
 
 // Handle image upload and save to Cloudinary
 app.post('/api/upload', upload.single('image'), (req, res) => {
@@ -61,9 +74,7 @@ app.get('/api/advertisements', async (req, res) => {
 });
 
 // Route to create a new advertisement with Cloudinary image upload
-app.post('/api/advertisements', upload.single('image'), async (req, res) => {
-    const { title, description } = req.body;
-
+app.post('/api/advertisements', upload.single('image'), validateAdvertisement, async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: 'No image uploaded' });
     }
@@ -75,9 +86,9 @@ app.post('/api/advertisements', upload.single('image'), async (req, res) => {
         }
 
         const newAdvertisement = new Advertisement({
-            title,
+            title: req.body.title,
             image: result.secure_url,  // Store Cloudinary image URL in the database
-            description,
+            description: req.body.description,
         });
 
         try {
@@ -120,9 +131,8 @@ app.delete('/api/advertisements/:id', async (req, res) => {
 });
 
 // Route to update an advertisement and optionally change the image
-app.put('/api/advertisements/:id', upload.single('image'), async (req, res) => {
+app.put('/api/advertisements/:id', upload.single('image'), validateAdvertisement, async (req, res) => {
     const { id } = req.params;
-    const { title, description } = req.body;
 
     try {
         const advertisement = await Advertisement.findById(id);
@@ -132,8 +142,8 @@ app.put('/api/advertisements/:id', upload.single('image'), async (req, res) => {
         }
 
         // Update title and description
-        advertisement.title = title || advertisement.title;
-        advertisement.description = description || advertisement.description;
+        advertisement.title = req.body.title || advertisement.title;
+        advertisement.description = req.body.description || advertisement.description;
 
         // If there's a new image, upload it to Cloudinary
         if (req.file) {
