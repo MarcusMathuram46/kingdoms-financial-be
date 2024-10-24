@@ -113,8 +113,9 @@ app.get('/api/advertisements', async (req, res) => {
 });
 
 // Route to create a new advertisement
-app.post('/api/advertisements', async (req, res) => {
-    const { title, image, description } = req.body;
+app.post('/api/advertisements', upload.single('image'), async (req, res) => {
+    const { title, description } = req.body;
+    const image = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : null;
 
     const newAdvertisement = new Advertisement({
         title,
@@ -131,8 +132,9 @@ app.post('/api/advertisements', async (req, res) => {
 });
 
 // Route to update an advertisement by ID
-app.put('/api/advertisements/:id', async (req, res) => {
-    const { title, image, description } = req.body;
+app.put('/api/advertisements/:id', upload.single('image'), async (req, res) => {
+    const { title, description } = req.body;
+    const image = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : undefined;
 
     try {
         const updatedAdvertisement = await Advertisement.findByIdAndUpdate(
