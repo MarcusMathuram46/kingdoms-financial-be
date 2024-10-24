@@ -3,60 +3,34 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
-const dotenv = require('dotenv');
-const winston = require('winston');
 
-// Load environment variables from .env file
-dotenv.config();
-
-const { MONGODB_URL, PORT = 5000, FRONTEND_URL, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
+const { MONGODB_URL, PORT } = require('./config');
 
 const User = require('./models/User');
 const Advertisement = require('./models/Advertisement');
 
 const app = express();
 
-// Configure logging
-const logger = winston.createLogger({
-    level: 'info',
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-    ),
-    transports: [
-        new winston.transports.Console(),
-        new winston.transports.File({ filename: 'error.log', level: 'error' }),
-        new winston.transports.File({ filename: 'combined.log' })
-    ],
-});
-
 // Middleware
 app.use(cors({
-    origin: FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true
 }));
 app.use(express.json());
 
 // Configure Cloudinary
 cloudinary.config({
-    cloud_name: CLOUDINARY_CLOUD_NAME,
-    api_key: CLOUDINARY_API_KEY,
-    api_secret: CLOUDINARY_API_SECRET,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Set up Multer for handling file uploads
-const storage = multer.memoryStorage();
+// Set up Multer for handling file uploads (but won't save locally)
+const storage = multer.memoryStorage(); // Store in memory since we'll upload directly to Cloudinary
 const upload = multer({ storage });
-
-// Middleware to validate advertisement data
-const validateAdvertisement = (req, res, next) => {
-    const { title, description } = req.body;
-    if (!title || !description) {
-        return res.status(400).json({ message: 'Title and description are required' });
-    }
-    next();
-};
 
 // Handle image upload and save to Cloudinary
 app.post('/api/upload', upload.single('image'), (req, res) => {
@@ -64,14 +38,15 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
         return res.status(400).json({ message: 'No image uploaded' });
     }
 
+    // Upload file to Cloudinary
     cloudinary.uploader.upload_stream({ resource_type: 'image' }, (error, result) => {
         if (error) {
-            logger.error('Cloudinary upload error:', { error });
-            return res.status(500).json({ message: 'Failed to upload image', error: error.message });
+            console.error('Cloudinary upload error:', error);
+            return res.status(500).json({ message: 'Failed to upload image', error });
         }
 
-        res.json({ imageUrl: result.secure_url });
-    }).end(req.file.buffer);
+        res.json({ imageUrl: result.secure_url }); // Send back the Cloudinary URL
+    }).end(req.file.buffer); // req.file.buffer holds the image data in memory
 });
 
 // Route to get all advertisements
@@ -80,34 +55,36 @@ app.get('/api/advertisements', async (req, res) => {
         const advertisements = await Advertisement.find();
         res.json(advertisements);
     } catch (error) {
-        logger.error('Error fetching advertisements:', { error });
+        console.error('Error fetching advertisements:', error);
         res.status(500).json({ message: error.message });
     }
 });
 
-// Route to create a new advertisement
-app.post('/api/advertisements', upload.single('image'), validateAdvertisement, async (req, res) => {
+// Route to create a new advertisement with Cloudinary image upload
+app.post('/api/advertisements', upload.single('image'), async (req, res) => {
+    const { title, description } = req.body;
+
     if (!req.file) {
         return res.status(400).json({ message: 'No image uploaded' });
     }
 
+    // Upload image to Cloudinary
     cloudinary.uploader.upload_stream({ resource_type: 'image' }, async (error, result) => {
         if (error) {
-            logger.error('Failed to upload image to Cloudinary:', { error });
-            return res.status(500).json({ message: 'Failed to upload image to Cloudinary', error: error.message });
+            return res.status(500).json({ message: 'Failed to upload image to Cloudinary', error });
         }
 
         const newAdvertisement = new Advertisement({
-            title: req.body.title,
-            image: result.secure_url,
-            description: req.body.description,
+            title,
+            image: result.secure_url,  // Store Cloudinary image URL in the database
+            description,
         });
 
         try {
             const savedAdvertisement = await newAdvertisement.save();
             res.status(201).json(savedAdvertisement);
         } catch (error) {
-            logger.error('Error saving advertisement:', { error });
+            console.error('Error saving advertisement:', error);
             res.status(400).json({ message: error.message });
         }
     }).end(req.file.buffer);
@@ -117,50 +94,62 @@ app.post('/api/advertisements', upload.single('image'), validateAdvertisement, a
 app.delete('/api/advertisements/:id', async (req, res) => {
     const { id } = req.params;
 
+    console.log(`Attempting to delete advertisement with ID: ${id}`); // Log the ID being deleted
+
     try {
         const advertisement = await Advertisement.findById(id);
+
         if (!advertisement) {
+            console.error(`Advertisement not found with ID: ${id}`); // Log if not found
             return res.status(404).json({ message: 'Advertisement not found' });
         }
 
         // Delete the image from Cloudinary
-        const publicId = advertisement.image.split('/').pop().split('.')[0];
+        const publicId = advertisement.image.split('/').pop().split('.')[0]; // Extract public ID from URL
         await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+        console.log(`Image deleted from Cloudinary: ${publicId}`);
 
+        // Delete the advertisement from the database
         await Advertisement.findByIdAndDelete(id);
         res.status(200).json({ message: 'Advertisement deleted successfully' });
 
     } catch (error) {
-        logger.error('Error deleting advertisement:', { error });
+        console.error('Error deleting advertisement:', error);
         res.status(500).json({ message: error.message });
     }
 });
 
-// Route to update an advertisement
-app.put('/api/advertisements/:id', upload.single('image'), validateAdvertisement, async (req, res) => {
+// Route to update an advertisement and optionally change the image
+app.put('/api/advertisements/:id', upload.single('image'), async (req, res) => {
     const { id } = req.params;
+    const { title, description } = req.body;
 
     try {
         const advertisement = await Advertisement.findById(id);
+
         if (!advertisement) {
             return res.status(404).json({ message: 'Advertisement not found' });
         }
 
         // Update title and description
-        advertisement.title = req.body.title || advertisement.title;
-        advertisement.description = req.body.description || advertisement.description;
+        advertisement.title = title || advertisement.title;
+        advertisement.description = description || advertisement.description;
 
+        // If there's a new image, upload it to Cloudinary
         if (req.file) {
-            const publicId = advertisement.image.split('/').pop().split('.')[0];
+            const publicId = advertisement.image.split('/').pop().split('.')[0]; // Extract public ID from URL
 
+            // Delete the old image from Cloudinary
             await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+            console.log(`Old image deleted from Cloudinary: ${publicId}`);
 
+            // Upload the new image to Cloudinary
             cloudinary.uploader.upload_stream({ resource_type: 'image' }, async (error, result) => {
                 if (error) {
-                    logger.error('Failed to upload new image:', { error });
-                    return res.status(500).json({ message: 'Failed to upload new image', error: error.message });
+                    return res.status(500).json({ message: 'Failed to upload new image', error });
                 }
 
+                // Update with the new Cloudinary URL
                 advertisement.image = result.secure_url;
                 const updatedAdvertisement = await advertisement.save();
                 res.status(200).json(updatedAdvertisement);
@@ -171,7 +160,7 @@ app.put('/api/advertisements/:id', upload.single('image'), validateAdvertisement
         }
 
     } catch (error) {
-        logger.error('Error updating advertisement:', { error });
+        console.error('Error updating advertisement:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -193,29 +182,26 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid username or password' });
         }
     } catch (error) {
-        logger.error("Server error:", { error });
+        console.error("Server error:", error);
         return res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    logger.error(err.stack);
+    console.error(err.stack);
     res.status(500).json({ message: 'Something broke!' });
 });
 
 // Connect to MongoDB and Start the Server
 mongoose.connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => {
-        logger.info('MongoDB Connected Successfully');
+        console.log('MongoDB Connected Successfully');
         app.listen(PORT, () => {
-            logger.info(`Server is running on port ${PORT}`);
+            console.log(`Server is running on port ${PORT}`);
         });
     })
-    .catch(err => {
-        logger.error('MongoDB connection error:', { err });
-        process.exit(1); // Exit process with failure
-    });
+    .catch(err => console.log('MongoDB connection error:', err));
 
 // Admin User Creation Script (uncomment to run if needed)
 const createAdminUser = async () => {
@@ -227,16 +213,15 @@ const createAdminUser = async () => {
 
     try {
         await adminUser.save();
-        logger.info('Admin user created successfully');
+        console.log('Admin user created successfully');
     } catch (error) {
         if (error.code === 11000) {
-            logger.warn('Admin user already exists:', error.message);
+            console.error('Admin user already exists:', error.message);
         } else {
-            logger.error('Error creating admin user:', { error });
+            console.error('Error creating admin user:', error.message);
         }
     }
 };
 
 // Uncomment to run this function if needed
 // createAdminUser();
-
