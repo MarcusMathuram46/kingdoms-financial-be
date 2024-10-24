@@ -55,6 +55,7 @@ app.get('/api/advertisements', async (req, res) => {
         const advertisements = await Advertisement.find();
         res.json(advertisements);
     } catch (error) {
+        console.error('Error fetching advertisements:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -83,6 +84,7 @@ app.post('/api/advertisements', upload.single('image'), async (req, res) => {
             const savedAdvertisement = await newAdvertisement.save();
             res.status(201).json(savedAdvertisement);
         } catch (error) {
+            console.error('Error saving advertisement:', error);
             res.status(400).json({ message: error.message });
         }
     }).end(req.file.buffer);
@@ -92,10 +94,13 @@ app.post('/api/advertisements', upload.single('image'), async (req, res) => {
 app.delete('/api/advertisements/:id', async (req, res) => {
     const { id } = req.params;
 
+    console.log(`Attempting to delete advertisement with ID: ${id}`); // Log the ID being deleted
+
     try {
         const advertisement = await Advertisement.findById(id);
 
         if (!advertisement) {
+            console.error(`Advertisement not found with ID: ${id}`); // Log if not found
             return res.status(404).json({ message: 'Advertisement not found' });
         }
 
@@ -109,6 +114,7 @@ app.delete('/api/advertisements/:id', async (req, res) => {
         res.status(200).json({ message: 'Advertisement deleted successfully' });
 
     } catch (error) {
+        console.error('Error deleting advertisement:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -154,6 +160,7 @@ app.put('/api/advertisements/:id', upload.single('image'), async (req, res) => {
         }
 
     } catch (error) {
+        console.error('Error updating advertisement:', error);
         res.status(500).json({ message: error.message });
     }
 });
