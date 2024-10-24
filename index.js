@@ -5,6 +5,7 @@ const cors = require('cors');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const dotenv = require('dotenv');
+const winston = require('winston');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -15,6 +16,20 @@ const User = require('./models/User');
 const Advertisement = require('./models/Advertisement');
 
 const app = express();
+
+// Configure logging
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+    ),
+    transports: [
+        new winston.transports.Console(),
+        new winston.transports.File({ filename: 'error.log', level: 'error' }),
+        new winston.transports.File({ filename: 'combined.log' })
+    ],
+});
 
 // Middleware
 app.use(cors({
@@ -51,8 +66,8 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 
     cloudinary.uploader.upload_stream({ resource_type: 'image' }, (error, result) => {
         if (error) {
-            console.error('Cloudinary upload error:', error);
-            return res.status(500).json({ message: 'Failed to upload image', error });
+            logger.error('Cloudinary upload error:', { error });
+            return res.status(500).json({ message: 'Failed to upload image', error: error.message });
         }
 
         res.json({ imageUrl: result.secure_url });
@@ -65,7 +80,7 @@ app.get('/api/advertisements', async (req, res) => {
         const advertisements = await Advertisement.find();
         res.json(advertisements);
     } catch (error) {
-        console.error('Error fetching advertisements:', error);
+        logger.error('Error fetching advertisements:', { error });
         res.status(500).json({ message: error.message });
     }
 });
@@ -78,7 +93,8 @@ app.post('/api/advertisements', upload.single('image'), validateAdvertisement, a
 
     cloudinary.uploader.upload_stream({ resource_type: 'image' }, async (error, result) => {
         if (error) {
-            return res.status(500).json({ message: 'Failed to upload image to Cloudinary', error });
+            logger.error('Failed to upload image to Cloudinary:', { error });
+            return res.status(500).json({ message: 'Failed to upload image to Cloudinary', error: error.message });
         }
 
         const newAdvertisement = new Advertisement({
@@ -91,7 +107,7 @@ app.post('/api/advertisements', upload.single('image'), validateAdvertisement, a
             const savedAdvertisement = await newAdvertisement.save();
             res.status(201).json(savedAdvertisement);
         } catch (error) {
-            console.error('Error saving advertisement:', error);
+            logger.error('Error saving advertisement:', { error });
             res.status(400).json({ message: error.message });
         }
     }).end(req.file.buffer);
@@ -115,7 +131,7 @@ app.delete('/api/advertisements/:id', async (req, res) => {
         res.status(200).json({ message: 'Advertisement deleted successfully' });
 
     } catch (error) {
-        console.error('Error deleting advertisement:', error);
+        logger.error('Error deleting advertisement:', { error });
         res.status(500).json({ message: error.message });
     }
 });
@@ -141,7 +157,8 @@ app.put('/api/advertisements/:id', upload.single('image'), validateAdvertisement
 
             cloudinary.uploader.upload_stream({ resource_type: 'image' }, async (error, result) => {
                 if (error) {
-                    return res.status(500).json({ message: 'Failed to upload new image', error });
+                    logger.error('Failed to upload new image:', { error });
+                    return res.status(500).json({ message: 'Failed to upload new image', error: error.message });
                 }
 
                 advertisement.image = result.secure_url;
@@ -154,7 +171,7 @@ app.put('/api/advertisements/:id', upload.single('image'), validateAdvertisement
         }
 
     } catch (error) {
-        console.error('Error updating advertisement:', error);
+        logger.error('Error updating advertisement:', { error });
         res.status(500).json({ message: error.message });
     }
 });
@@ -176,27 +193,27 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid username or password' });
         }
     } catch (error) {
-        console.error("Server error:", error);
+        logger.error("Server error:", { error });
         return res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    logger.error(err.stack);
     res.status(500).json({ message: 'Something broke!' });
 });
 
 // Connect to MongoDB and Start the Server
 mongoose.connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => {
-        console.log('MongoDB Connected Successfully');
+        logger.info('MongoDB Connected Successfully');
         app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
+            logger.info(`Server is running on port ${PORT}`);
         });
     })
     .catch(err => {
-        console.error('MongoDB connection error:', err);
+        logger.error('MongoDB connection error:', { err });
         process.exit(1); // Exit process with failure
     });
 
@@ -210,15 +227,16 @@ const createAdminUser = async () => {
 
     try {
         await adminUser.save();
-        console.log('Admin user created successfully');
+        logger.info('Admin user created successfully');
     } catch (error) {
         if (error.code === 11000) {
-            console.error('Admin user already exists:', error.message);
+            logger.warn('Admin user already exists:', error.message);
         } else {
-            console.error('Error creating admin user:', error.message);
+            logger.error('Error creating admin user:', { error });
         }
     }
 };
 
 // Uncomment to run this function if needed
 // createAdminUser();
+
