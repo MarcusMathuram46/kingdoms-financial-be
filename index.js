@@ -64,8 +64,6 @@ app.post('/api/upload', (req, res) => {
     console.log('Received upload request');
 
     upload.single('image')(req, res, (err) => {
-        console.log('Inside multer middleware');
-
         if (err) {
             console.error("Multer error:", err);
             return res.status(500).json({ message: 'File upload failed', error: err.message });
@@ -129,6 +127,42 @@ app.post('/api/advertisements', async (req, res) => {
         res.status(201).json(savedAdvertisement);
     } catch (error) {
         res.status(400).json({ message: error.message });
+    }
+});
+
+// Route to update an advertisement by ID
+app.put('/api/advertisements/:id', async (req, res) => {
+    const { title, image, description } = req.body;
+
+    try {
+        const updatedAdvertisement = await Advertisement.findByIdAndUpdate(
+            req.params.id,
+            { title, image, description },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedAdvertisement) {
+            return res.status(404).json({ message: 'Advertisement not found' });
+        }
+
+        res.json(updatedAdvertisement);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Route to delete an advertisement by ID
+app.delete('/api/advertisements/:id', async (req, res) => {
+    try {
+        const deletedAdvertisement = await Advertisement.findByIdAndDelete(req.params.id);
+
+        if (!deletedAdvertisement) {
+            return res.status(404).json({ message: 'Advertisement not found' });
+        }
+
+        res.json({ message: 'Advertisement deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 });
 
