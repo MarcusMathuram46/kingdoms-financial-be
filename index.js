@@ -2,15 +2,15 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
+const axios = require('axios');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-
 const { MONGODB_URL, PORT } = require('./config');
-
 const User = require('./models/User');
 const Advertisement = require('./models/Advertisement');
-
+const Visitor = require('./models/Visitor'); 
+const Enquiry = require('./models/Enquiry');
 const app = express();
 
 // Middleware
@@ -29,6 +29,42 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Serve static files from the 'uploads' directory
 app.use('/uploads', express.static(uploadsDir));
+
+
+
+// Middleware to log visitors
+app.post('/api/visitors', async (req, res) => {
+    const { ipAddress, city, region, country } = req.body;
+  
+    try {
+      // Find if the visitor already exists
+      let visitor = await Visitor.findOne({ ipAddress });
+  
+      if (visitor) {
+        // If found, update the existing record
+        visitor.city = city;
+        visitor.region = region;
+        visitor.country = country;
+        visitor.visitTime = Date.now(); // Update visit time
+      } else {
+        // If not found, create a new record
+        visitor = new Visitor({
+          ipAddress,
+          city,
+          region,
+          country,
+        });
+      }
+  
+      // Save the visitor record
+      await visitor.save();
+      res.status(201).json(visitor);
+    } catch (error) {
+      res.status(400).json({ message: 'Error saving visitor', error: error.message });
+    }
+  });
+  
+
 
 // Set up Multer storage
 const storage = multer.diskStorage({
@@ -167,6 +203,114 @@ app.delete('/api/advertisements/:id', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+
+
+// Add an enquiry
+app.post('/api/enquiries', async (req, res) => {
+    try {
+        const enquiry = new Enquiry(req.body);
+        await enquiry.save();
+        res.status(201).json({ message: 'Enquiry added successfully', enquiry });
+    } catch (error) {
+        console.error("Error adding enquiry:", error);
+        res.status(500).json({ message: 'Error adding enquiry', error: error.message });
+    }
+});
+
+// Fetch all enquiries
+app.get('/api/enquiries', async (req, res) => {
+    try {
+        const enquiries = await Enquiry.find();
+        res.status(200).json(enquiries);
+    } catch (error) {
+        console.error("Error fetching enquiries:", error);
+        res.status(500).json({ message: 'Error fetching enquiries', error: error.message });
+    }
+});
+
+// Delete selected enquiries
+app.delete('/api/enquiries', async (req, res) => {
+    try {
+        const { ids } = req.body; // IDs of enquiries to delete
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'No enquiry IDs provided' });
+        }
+        
+        await Enquiry.deleteMany({ _id: { $in: ids } });
+        res.status(200).json({ message: 'Selected enquiries deleted successfully' });
+    } catch (error) {
+        console.error("Error deleting enquiries:", error);
+        res.status(500).json({ message: 'Error deleting enquiries', error: error.message });
+    }
+});
+
+
+// Route to get all visitors
+app.get('/api/visitors', async (req, res) => {
+    try {
+        const visitors = await Visitor.find();
+        res.json(visitors);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching visitors', error: error.message });
+    }
+});
+
+
+// Route to add or update a visitor
+app.post('/api/visitors', async (req, res) => {
+    const { ipAddress, city, region, country } = req.body;
+
+    try {
+        // Check if the visitor already exists
+        let visitor = await Visitor.findOne({ ipAddress });
+
+        if (visitor) {
+            // Update the existing visitor's details
+            visitor.city = city;
+            visitor.region = region;
+            visitor.country = country;
+            visitor.visitTime = Date.now();
+        } else {
+            // Create a new visitor
+            visitor = new Visitor({ ipAddress, city, region, country });
+        }
+
+        const savedVisitor = await visitor.save();
+        res.status(201).json(savedVisitor);
+    } catch (error) {
+        res.status(400).json({ message: 'Error saving visitor', error: error.message });
+    }
+});
+
+
+// Route to delete a visitor by ID
+app.delete('/api/visitors/:id', async (req, res) => {
+    try {
+        const deletedVisitor = await Visitor.findByIdAndDelete(req.params.id);
+        if (!deletedVisitor) {
+            return res.status(404).json({ message: 'Visitor not found' });
+        }
+        res.json({ message: 'Visitor deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting visitor', error: error.message });
+    }
+});
+
+// Route to delete multiple visitors by IDs
+app.delete('/api/visitors', async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: 'No visitor IDs provided' });
+    }
+
+    try {
+        await Visitor.deleteMany({ _id: { $in: ids } });
+        res.status(200).json({ message: 'Selected visitors deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting visitors', error: error.message });
+    }
+});
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
