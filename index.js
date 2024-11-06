@@ -1,352 +1,341 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
-const cors = require('cors');
-const axios = require('axios');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { MONGODB_URL, PORT } = require('./config');
-const User = require('./models/User');
-const Advertisement = require('./models/Advertisement');
-const Visitor = require('./models/Visitor'); 
-const Enquiry = require('./models/Enquiry');
+const express = require("express");
+const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
+const cors = require("cors");
+const axios = require("axios");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const { MONGODB_URL, PORT } = require("./config");
+const User = require("./models/User");
+const Advertisement = require("./models/Advertisement");
+const Visitor = require("./models/Visitor");
+const Enquiry = require("./models/Enquiry");
 const app = express();
 
 // Middleware
-app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Create 'uploads' directory if it doesn't exist
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir);
-    console.log('Uploads directory created');
+  fs.mkdirSync(uploadsDir);
+  console.log("Uploads directory created");
 }
 
 // Serve static files from the 'uploads' directory
-app.use('/uploads', express.static(uploadsDir));
-
-
+app.use("/uploads", express.static(uploadsDir));
 
 // Middleware to log visitors
-app.post('/api/visitors', async (req, res) => {
-    const { ipAddress, city, region, country } = req.body;
-  
-    try {
-      // Find if the visitor already exists
-      let visitor = await Visitor.findOne({ ipAddress });
-  
-      if (visitor) {
-        // If found, update the existing record
-        visitor.city = city;
-        visitor.region = region;
-        visitor.country = country;
-        visitor.visitTime = Date.now(); // Update visit time
-      } else {
-        // If not found, create a new record
-        visitor = new Visitor({
-          ipAddress,
-          city,
-          region,
-          country,
-        });
-      }
-  
-      // Save the visitor record
-      await visitor.save();
-      res.status(201).json(visitor);
-    } catch (error) {
-      res.status(400).json({ message: 'Error saving visitor', error: error.message });
-    }
-  });
-  
+app.post("/api/visitors", async (req, res) => {
+  const { ipAddress, city, region, country } = req.body;
 
+  try {
+    // Find if the visitor already exists
+    let visitor = await Visitor.findOne({ ipAddress });
+
+    if (visitor) {
+      // If found, update the existing record
+      visitor.city = city;
+      visitor.region = region;
+      visitor.country = country;
+      visitor.visitTime = Date.now(); // Update visit time
+    } else {
+      // If not found, create a new record
+      visitor = new Visitor({
+        ipAddress,
+        city,
+        region,
+        country,
+      });
+    }
+
+    // Save the visitor record
+    await visitor.save();
+    res.status(201).json(visitor);
+  } catch (error) {
+    res
+      .status(400)
+      .json({ message: "Error saving visitor", error: error.message });
+  }
+});
 
 // Set up Multer storage
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadsDir); // Save files to the 'uploads' directory
-    },
-    filename: (req, file, cb) => {
-        // Use a timestamp to create unique filenames
-        cb(null, Date.now() + path.extname(file.originalname));
-    },
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir); // Save files to the 'uploads' directory
+  },
+  filename: (req, file, cb) => {
+    // Use a timestamp to create unique filenames
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
 });
 
 // Initialize Multer for image upload
 const upload = multer({
-    storage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB limit
-    fileFilter: (req, file, cb) => {
-        const filetypes = /jpeg|jpg|png|gif/; // Allowed file types
-        const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB limit
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif/; // Allowed file types
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
 
-        console.log(`File type: ${file.mimetype}, Extname: ${path.extname(file.originalname)}`); // Log file type info
+    console.log(
+      `File type: ${file.mimetype}, Extname: ${path.extname(file.originalname)}`
+    ); // Log file type info
 
-        if (mimetype && extname) {
-            return cb(null, true);
-        }
-        cb('Error: File type not supported');
-    },
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb("Error: File type not supported");
+  },
 });
 
 // Handle image upload
-app.post('/api/upload', (req, res) => {
-    console.log('Received upload request');
+app.post("/api/upload", (req, res) => {
+  console.log("Received upload request");
 
-    upload.single('image')(req, res, (err) => {
-        if (err) {
-            console.error("Multer error:", err);
-            return res.status(500).json({ message: 'File upload failed', error: err.message });
-        }
+  upload.single("image")(req, res, (err) => {
+    if (err) {
+      console.error("Multer error:", err);
+      return res
+        .status(500)
+        .json({ message: "File upload failed", error: err.message });
+    }
 
-        if (!req.file) {
-            console.log('No file uploaded:', req.file);
-            return res.status(400).json({ message: 'No file uploaded' });
-        }
+    if (!req.file) {
+      console.log("No file uploaded:", req.file);
+      return res.status(400).json({ message: "No file uploaded" });
+    }
 
-        const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-        console.log('File uploaded successfully:', imageUrl);
-        res.json({ imageUrl });
-    });
+    const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${
+      req.file.filename
+    }`;
+    console.log("File uploaded successfully:", imageUrl);
+    res.json({ imageUrl });
+  });
 });
 
 // Login Route
-app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
+app.post("/api/login", async (req, res) => {
+  const { username, password } = req.body;
 
-    try {
-        const user = await User.findOne({ username });
-        if (!user) {
-            return res.status(401).json({ message: 'Invalid username or password' });
-        }
-
-        const passwordMatch = await bcrypt.compare(password, user.password);
-        if (passwordMatch) {
-            return res.status(200).json({ message: 'Login successful', isAdmin: user.isAdmin });
-        } else {
-            return res.status(401).json({ message: 'Invalid username or password' });
-        }
-    } catch (error) {
-        console.error("Server error:", error);
-        return res.status(500).json({ message: 'Server error', error: error.message });
+  try {
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid username or password" });
     }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (passwordMatch) {
+      return res
+        .status(200)
+        .json({ message: "Login successful", isAdmin: user.isAdmin });
+    } else {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+  } catch (error) {
+    console.error("Server error:", error);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
+  }
 });
 
 // Route to get all advertisements
-app.get('/api/advertisements', async (req, res) => {
-    try {
-        const advertisements = await Advertisement.find();
-        res.json(advertisements);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+app.get("/api/advertisements", async (req, res) => {
+  try {
+    const advertisements = await Advertisement.find();
+    res.json(advertisements);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // Route to create a new advertisement
-app.post('/api/advertisements', upload.single('image'), async (req, res) => {
-    const { title, description } = req.body;
-    const image = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : null;
+app.post("/api/advertisements", upload.single("image"), async (req, res) => {
+  const { title, description } = req.body;
+  const image = req.file
+    ? `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`
+    : null;
 
-    const newAdvertisement = new Advertisement({
-        title,
-        image,  // Ensure image URL is passed here after upload
-        description,
-    });
+  const newAdvertisement = new Advertisement({
+    title,
+    image, // Ensure image URL is passed here after upload
+    description,
+  });
 
-    try {
-        const savedAdvertisement = await newAdvertisement.save();
-        res.status(201).json(savedAdvertisement);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
+  try {
+    const savedAdvertisement = await newAdvertisement.save();
+    res.status(201).json(savedAdvertisement);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
 });
 
 // Route to update an advertisement by ID
-app.put('/api/advertisements/:id', upload.single('image'), async (req, res) => {
-    const { title, description } = req.body;
-    const image = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : undefined;
+app.put("/api/advertisements/:id", upload.single("image"), async (req, res) => {
+  const { title, description } = req.body;
+  const image = req.file
+    ? `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`
+    : undefined;
 
-    try {
-        const updatedAdvertisement = await Advertisement.findByIdAndUpdate(
-            req.params.id,
-            { title, image, description },
-            { new: true, runValidators: true }
-        );
+  try {
+    const updatedAdvertisement = await Advertisement.findByIdAndUpdate(
+      req.params.id,
+      { title, image, description },
+      { new: true, runValidators: true }
+    );
 
-        if (!updatedAdvertisement) {
-            return res.status(404).json({ message: 'Advertisement not found' });
-        }
-
-        res.json(updatedAdvertisement);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
+    if (!updatedAdvertisement) {
+      return res.status(404).json({ message: "Advertisement not found" });
     }
+
+    res.json(updatedAdvertisement);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
 });
 
 // Route to delete an advertisement by ID
-app.delete('/api/advertisements/:id', async (req, res) => {
-    try {
-        const deletedAdvertisement = await Advertisement.findByIdAndDelete(req.params.id);
+app.delete("/api/advertisements/:id", async (req, res) => {
+  try {
+    const deletedAdvertisement = await Advertisement.findByIdAndDelete(
+      req.params.id
+    );
 
-        if (!deletedAdvertisement) {
-            return res.status(404).json({ message: 'Advertisement not found' });
-        }
-
-        res.json({ message: 'Advertisement deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (!deletedAdvertisement) {
+      return res.status(404).json({ message: "Advertisement not found" });
     }
+
+    res.json({ message: "Advertisement deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
-
 // Add an enquiry
-app.post('/api/enquiries', async (req, res) => {
-    try {
-        const enquiry = new Enquiry(req.body);
-        await enquiry.save();
-        res.status(201).json({ message: 'Enquiry added successfully', enquiry });
-    } catch (error) {
-        console.error("Error adding enquiry:", error);
-        res.status(500).json({ message: 'Error adding enquiry', error: error.message });
-    }
+app.post("/api/enquiries", async (req, res) => {
+  try {
+    const enquiry = new Enquiry(req.body);
+    await enquiry.save();
+    res.status(201).json({ message: "Enquiry added successfully", enquiry });
+  } catch (error) {
+    console.error("Error adding enquiry:", error);
+    res
+      .status(500)
+      .json({ message: "Error adding enquiry", error: error.message });
+  }
 });
 
 // Fetch all enquiries
-app.get('/api/enquiries', async (req, res) => {
-    try {
-        const enquiries = await Enquiry.find();
-        res.status(200).json(enquiries);
-    } catch (error) {
-        console.error("Error fetching enquiries:", error);
-        res.status(500).json({ message: 'Error fetching enquiries', error: error.message });
-    }
+app.get("/api/enquiries", async (req, res) => {
+  try {
+    const enquiries = await Enquiry.find();
+    res.status(200).json(enquiries);
+  } catch (error) {
+    console.error("Error fetching enquiries:", error);
+    res
+      .status(500)
+      .json({ message: "Error fetching enquiries", error: error.message });
+  }
 });
 
 // Delete selected enquiries
-app.delete('/api/enquiries', async (req, res) => {
-    try {
-        const { ids } = req.body; // IDs of enquiries to delete
-        if (!Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ message: 'No enquiry IDs provided' });
-        }
-        
-        await Enquiry.deleteMany({ _id: { $in: ids } });
-        res.status(200).json({ message: 'Selected enquiries deleted successfully' });
-    } catch (error) {
-        console.error("Error deleting enquiries:", error);
-        res.status(500).json({ message: 'Error deleting enquiries', error: error.message });
+app.delete("/api/enquiries", async (req, res) => {
+  try {
+    const { ids } = req.body; // IDs of enquiries to delete
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No enquiry IDs provided" });
     }
-});
 
+    await Enquiry.deleteMany({ _id: { $in: ids } });
+    res
+      .status(200)
+      .json({ message: "Selected enquiries deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting enquiries:", error);
+    res
+      .status(500)
+      .json({ message: "Error deleting enquiries", error: error.message });
+  }
+});
 
 // Route to get all visitors
-app.get('/api/visitors', async (req, res) => {
-    try {
-        const visitors = await Visitor.find();
-        res.json(visitors);
-    } catch (error) {
-        res.status(500).json({ message: 'Error fetching visitors', error: error.message });
-    }
+app.get("/api/visitors", async (req, res) => {
+  try {
+    const visitors = await Visitor.find();
+    res.json(visitors);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching visitors", error: error.message });
+  }
 });
-
 
 // Route to add or update a visitor
-app.post('/api/visitors', async (req, res) => {
-    const { ipAddress, city, region, country } = req.body;
+app.post("/api/visitors", async (req, res) => {
+  const { ipAddress, city, region, country } = req.body;
 
-    try {
-        // Check if the visitor already exists
-        let visitor = await Visitor.findOne({ ipAddress });
+  try {
+    // Check if the visitor already exists
+    let visitor = await Visitor.findOne({ ipAddress });
 
-        if (visitor) {
-            // Update the existing visitor's details
-            visitor.city = city;
-            visitor.region = region;
-            visitor.country = country;
-            visitor.visitTime = Date.now();
-        } else {
-            // Create a new visitor
-            visitor = new Visitor({ ipAddress, city, region, country });
-        }
-
-        const savedVisitor = await visitor.save();
-        res.status(201).json(savedVisitor);
-    } catch (error) {
-        res.status(400).json({ message: 'Error saving visitor', error: error.message });
+    if (visitor) {
+      // Update the existing visitor's details
+      visitor.city = city;
+      visitor.region = region;
+      visitor.country = country;
+      visitor.visitTime = Date.now();
+    } else {
+      // Create a new visitor
+      visitor = new Visitor({ ipAddress, city, region, country });
     }
+
+    const savedVisitor = await visitor.save();
+    res.status(201).json(savedVisitor);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error saving visitor", error: error.message });
+  }
 });
 
-
-// Route to delete a visitor by ID
-app.delete('/api/visitors/:id', async (req, res) => {
-    try {
-        const deletedVisitor = await Visitor.findByIdAndDelete(req.params.id);
-        if (!deletedVisitor) {
-            return res.status(404).json({ message: 'Visitor not found' });
-        }
-        res.json({ message: 'Visitor deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error deleting visitor', error: error.message });
-    }
-});
-
-// Route to delete multiple visitors by IDs
 app.delete('/api/visitors', async (req, res) => {
-    const { ids } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0) {
-        return res.status(400).json({ message: 'No visitor IDs provided' });
-    }
-
     try {
-        await Visitor.deleteMany({ _id: { $in: ids } });
-        res.status(200).json({ message: 'Selected visitors deleted successfully' });
+      const { ids } = req.query; // Get the list of IDs from the query string
+      if (!ids || !Array.isArray(ids)) {
+        return res.status(400).send('Invalid or missing visitor IDs');
+      }
+  
+      // Delete visitors by their IDs
+      await Visitor.deleteMany({ _id: { $in: ids } });
+  
+      res.status(200).send({ message: 'Visitors deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting visitors', error: error.message });
+      console.error('Error deleting visitors:', error);
+      res.status(500).send('Error deleting visitors. Please try again.');
     }
-});
+  });
+  
 
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ message: 'Something broke!' });
-});
-
-// Connect to MongoDB and Start the Server
-mongoose.connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => {
-        console.log('MongoDB Connected Successfully');
-        app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
-    })
-    .catch(err => console.log('MongoDB connection error:', err));
-
-// Admin User Creation Script
-const createAdminUser = async () => {
-    const adminUser = new User({
-        username: 'admin',
-        password: await bcrypt.hash('admin123', 10),
-        isAdmin: true,
+// Connect to MongoDB
+mongoose
+  .connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => {
+    console.log("Connected to MongoDB");
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
     });
-
-    try {
-        await adminUser.save();
-        console.log('Admin user created successfully');
-    } catch (error) {
-        if (error.code === 11000) {
-            console.error('Admin user already exists:', error.message);
-        } else {
-            console.error('Error creating admin user:', error.message);
-        }
-    }
-};
-
-// Uncomment to run this function if needed
-// createAdminUser();
+  })
+  .catch((error) => {
+    console.error("Error connecting to MongoDB:", error);
+  });
