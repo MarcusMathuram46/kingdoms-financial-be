@@ -9,6 +9,7 @@ const fs = require("fs");
 const { MONGODB_URL, PORT } = require("./config");
 const User = require("./models/User");
 const Advertisement = require("./models/Advertisement");
+const Service = require('./models/Service');
 const Visitor = require("./models/Visitor");
 const Enquiry = require("./models/Enquiry");
 const app = express();
@@ -238,6 +239,84 @@ app.delete("/api/advertisements", async (req, res) => {
   } catch (error) {
     console.error("Error deleting advertisements:", error);
     res.status(500).json({ message: "Error deleting advertisements", error: error.message });
+  }
+});
+
+// Route to create a new service (POST)
+app.post("/api/services", async (req, res) => {
+  const { title, image, description } = req.body;
+
+  // Create a new service instance
+  const newService = new Service({
+    title,
+    image,
+    description,
+  });
+
+  try {
+    // Save the new service to the database
+    const savedService = await newService.save();
+    res.status(201).json(savedService); // Return the saved service
+  } catch (error) {
+    console.error("Error saving service:", error);
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Route to update a service by ID (PUT)
+app.put("/api/services/:id", async (req, res) => {
+  const { title, image, description } = req.body;
+
+  try {
+    // Find the service by ID and update it
+    const updatedService = await Service.findByIdAndUpdate(
+      req.params.id,
+      { title, image, description },
+      { new: true, runValidators: true } // Ensure the updated document is returned
+    );
+
+    if (!updatedService) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    res.json(updatedService); // Return the updated service
+  } catch (error) {
+    console.error("Error updating service:", error);
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Route to delete a service by ID (DELETE)
+app.delete("/api/services/:id", async (req, res) => {
+  try {
+    const deletedService = await Service.findByIdAndDelete(req.params.id);
+
+    if (!deletedService) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    res.json({ message: "Service deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting service:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Route to delete selected services by their IDs (DELETE)
+app.delete("/api/services", async (req, res) => {
+  try {
+    const { ids } = req.body; // Expecting an array of IDs to delete
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No service IDs provided" });
+    }
+
+    // Use deleteMany to delete multiple services based on the provided IDs
+    await Service.deleteMany({ _id: { $in: ids } });
+
+    res.status(200).json({ message: "Selected services deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting services:", error);
+    res.status(500).json({ message: "Error deleting services", error: error.message });
   }
 });
 
