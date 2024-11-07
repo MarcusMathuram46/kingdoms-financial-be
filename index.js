@@ -206,6 +206,7 @@ app.put("/api/advertisements/:id", upload.single("image"), async (req, res) => {
 });
 
 // Route to delete an advertisement by ID
+// Route to delete a single advertisement by its ID
 app.delete("/api/advertisements/:id", async (req, res) => {
   try {
     const deletedAdvertisement = await Advertisement.findByIdAndDelete(
@@ -218,9 +219,28 @@ app.delete("/api/advertisements/:id", async (req, res) => {
 
     res.json({ message: "Advertisement deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Error deleting advertisement", error: error.message });
   }
 });
+
+// Route to delete selected advertisements by their IDs
+app.delete("/api/advertisements", async (req, res) => {
+  try {
+    const { ids } = req.body; // Expecting an array of IDs to delete
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No advertisement IDs provided" });
+    }
+
+    // Use deleteMany to delete multiple advertisements based on the provided IDs
+    await Advertisement.deleteMany({ _id: { $in: ids } });
+
+    res.status(200).json({ message: "Selected advertisements deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting advertisements:", error);
+    res.status(500).json({ message: "Error deleting advertisements", error: error.message });
+  }
+});
+
 
 // Add an enquiry
 app.post("/api/enquiries", async (req, res) => {
