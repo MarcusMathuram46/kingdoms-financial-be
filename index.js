@@ -242,62 +242,59 @@ app.delete("/api/advertisements", async (req, res) => {
   }
 });
 
-// Route to create a new service (POST)
-app.post("/api/services", async (req, res) => {
-  const { title, image, description } = req.body;
+// POST Route for saving the service (and uploading the image)
+app.post("/api/services", upload.single("image"), async (req, res) => {
+  const { title, description } = req.body;
+  const image = req.file ? req.file.path : null;
 
-  // Create a new service instance
-  const newService = new Service({
-    title,
-    image,
-    description,
-  });
+  if (!title || !description) {
+    return res.status(400).json({ message: "Title and description are required" });
+  }
 
   try {
-    // Save the new service to the database
+    const newService = new Service({ title, image, description });
     const savedService = await newService.save();
-    res.status(201).json(savedService); // Return the saved service
+
+    // Correct the image URL to be publicly accessible
+    savedService.image = savedService.image ? `http://localhost:5000/uploads/${savedService.image.split(path.sep).join('/')}` : null;
+
+    res.status(201).json(savedService);
   } catch (error) {
     console.error("Error saving service:", error);
     res.status(400).json({ message: error.message });
   }
 });
 
-// Route to update a service by ID (PUT)
-app.put("/api/services/:id", async (req, res) => {
-  const { title, image, description } = req.body;
+
+
+// Route to update a service by ID
+app.put("/api/services/:id", upload.single("image"), async (req, res) => {
+  const { title, description } = req.body;
+  const image = req.file ? req.file.path : undefined;
+
+  if (!title || !description) {
+    return res.status(400).json({ message: "Title and description are required" });
+  }
 
   try {
-    // Find the service by ID and update it
     const updatedService = await Service.findByIdAndUpdate(
       req.params.id,
-      { title, image, description },
-      { new: true, runValidators: true } // Ensure the updated document is returned
+      { title, description, image },
+      { new: true, runValidators: true }
     );
 
     if (!updatedService) {
       return res.status(404).json({ message: "Service not found" });
     }
 
-    res.json(updatedService); // Return the updated service
+    res.json(updatedService);
   } catch (error) {
     console.error("Error updating service:", error);
     res.status(400).json({ message: error.message });
   }
 });
 
-// Route to get all services (GET)
-app.get("/api/services", async (req, res) => {
-  try {
-    const services = await Service.find(); // Retrieve all services from the database
-    res.json(services); // Send the list of services as JSON
-  } catch (error) {
-    console.error("Error fetching services:", error);
-    res.status(500).json({ message: "Error fetching services", error: error.message });
-  }
-});
-
-// Route to delete a service by ID (DELETE)
+// Route to delete a service by ID
 app.delete("/api/services/:id", async (req, res) => {
   try {
     const deletedService = await Service.findByIdAndDelete(req.params.id);
@@ -313,21 +310,52 @@ app.delete("/api/services/:id", async (req, res) => {
   }
 });
 
-// Route to delete selected services by their IDs (DELETE)
+// Route to delete multiple services by IDs
 app.delete("/api/services", async (req, res) => {
+  console.log("Received delete request with ids:", req.body.ids); // Log the received IDs
   try {
-    const { ids } = req.body; // Expecting an array of IDs to delete
+    const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: "No service IDs provided" });
     }
 
-    // Use deleteMany to delete multiple services based on the provided IDs
-    await Service.deleteMany({ _id: { $in: ids } });
+    // Ensure ObjectId is created using 'new' syntax
+    const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));  // Ensure to use 'new'
+
+    const result = await Service.deleteMany({ _id: { $in: objectIds } });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "No services found with the provided IDs" });
+    }
 
     res.status(200).json({ message: "Selected services deleted successfully" });
   } catch (error) {
     console.error("Error deleting services:", error);
     res.status(500).json({ message: "Error deleting services", error: error.message });
+  }
+});
+
+
+
+// Route to get all services (with pagination)
+app.get("/api/services", async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+
+  try {
+    const services = await Service.find()
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const totalCount = await Service.countDocuments();
+    res.json({
+      services,
+      totalCount,
+      page,
+      totalPages: Math.ceil(totalCount / limit),
+    });
+  } catch (error) {
+    console.error("Error fetching services:", error);
+    res.status(500).json({ message: "Error fetching services", error: error.message });
   }
 });
 
