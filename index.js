@@ -286,6 +286,17 @@ app.put("/api/services/:id", async (req, res) => {
   }
 });
 
+// Route to get all services (GET)
+app.get("/api/services", async (req, res) => {
+  try {
+    const services = await Service.find(); // Retrieve all services from the database
+    res.json(services); // Send the list of services as JSON
+  } catch (error) {
+    console.error("Error fetching services:", error);
+    res.status(500).json({ message: "Error fetching services", error: error.message });
+  }
+});
+
 // Route to delete a service by ID (DELETE)
 app.delete("/api/services/:id", async (req, res) => {
   try {
