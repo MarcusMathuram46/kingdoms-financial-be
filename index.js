@@ -16,10 +16,11 @@ app.use(
 );
 app.use(express.json());
 
+
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Routes
-app.use("/api/login", require("./routes/userRoute"))
+app.use("/api", require("./routes/userRoute"))
 
 app.use("/api/advertisements", require("./routes/advertisementRoute"))
 
