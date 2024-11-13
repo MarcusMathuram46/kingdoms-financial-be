@@ -2,27 +2,23 @@ const Service = require("../models/Service");
 const mongoose = require("mongoose");
 const path = require("path");
 
+// Create Service
 exports.createService = async (req, res, next) => {
   const { title, description } = req.body;
-  const image = req.file ? req.file.path : null;
 
-  if (!title || !description) {
-    return res
-      .status(400)
-      .json({ message: "Title and description are required" });
-  }
+  const image = req.file
+  ? `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`
+  : null;
 
-  try {
-    const newService = new Service({ title, image, description });
+  const newService = new Service({
+    title,
+    description,
+    image, // Save the file path (which will be used later to generate the public URL)
+  });
+
+  try {    
+    // Save the service in the database
     const savedService = await newService.save();
-
-    // Correct the image URL to be publicly accessible
-    savedService.image = savedService.image
-      ? `http://localhost:5000/uploads/${savedService.image
-          .split(path.sep)
-          .join("/")}`
-      : null;
-
     res.status(201).json(savedService);
   } catch (error) {
     console.error("Error saving service:", error);
@@ -33,18 +29,14 @@ exports.createService = async (req, res, next) => {
 //update a service by ID
 exports.updateService = async (req, res, next) => {
   const { title, description } = req.body;
-  const image = req.file ? req.file.path : undefined;
-
-  if (!title || !description) {
-    return res
-      .status(400)
-      .json({ message: "Title and description are required" });
-  }
+  const image = req.file
+    ? `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`
+    : undefined;
 
   try {
     const updatedService = await Service.findByIdAndUpdate(
       req.params.id,
-      { title, description, image },
+      { title,  image, description, },
       { new: true, runValidators: true }
     );
 
@@ -126,5 +118,21 @@ exports.getAllServices = async (req, res, next) => {
     res
       .status(500)
       .json({ message: "Error fetching services", error: error.message });
+  }
+};
+// Get a service by ID
+exports.getServiceById = async (req, res, next) => {
+  try {
+    // Find the service by ID
+    const service = await Service.findById(req.params.id);
+
+    if (!service) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    res.json(service);
+  } catch (error) {
+    console.error("Error fetching service by ID:", error);
+    res.status(500).json({ message: "Error fetching service", error: error.message });
   }
 };
